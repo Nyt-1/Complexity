@@ -1,0 +1,252 @@
+% ============================================================
+%  Theory of Computation -- Homework Template
+%  Compile with:  pdflatex hw-template.tex   (run twice)
+% ============================================================
+\documentclass[11pt]{article}
+
+% ---------- Packages ----------
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb, amsthm, mathtools}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{fancyhdr}
+\usepackage{tikz}
+\usetikzlibrary{automata, positioning, arrows.meta, calc}
+\usepackage{algorithm}
+\usepackage[noend]{algpseudocode}
+\usepackage{xcolor}
+\usepackage[hidelinks]{hyperref}
+
+% ---------- Fill these in ----------
+\newcommand{\studentname}{Your Name}
+\newcommand{\coursename}{Theory of Computation}
+\newcommand{\hwnumber}{1}
+\newcommand{\duedate}{October 9, 2026}
+\newcommand{\collaborators}{None}   % list anyone you worked with
+
+% ---------- Header / footer ----------
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\studentname}
+\chead{\coursename}
+\rhead{Homework \hwnumber}
+\cfoot{\thepage}
+\setlength{\headheight}{14pt}
+
+% ---------- Problem / solution environments ----------
+\newcounter{problem}
+\newenvironment{problem}[1][]{%
+  \refstepcounter{problem}\par\bigskip
+  \noindent\textbf{Problem \theproblem}%
+  \if\relax\detokenize{#1}\relax\else\ \textbf{(#1)}\fi
+  \par\smallskip\noindent\itshape
+}{\par\medskip}
+
+\newenvironment{solution}{%
+  \par\noindent\textbf{Solution.}\ \normalfont
+}{\hfill$\blacksquare$\par\medskip}
+
+% Sub-parts: \begin{parts} \item ... \end{parts}  -> (a), (b), ...
+\newlist{parts}{enumerate}{1}
+\setlist[parts]{label=(\alph*), leftmargin=*}
+
+% Theorem-style environments
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{claim}[theorem]{Claim}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+
+% ---------- Notation macros ----------
+% Alphabets, strings
+\newcommand{\Sig}{\Sigma}
+\newcommand{\Gam}{\Gamma}
+\newcommand{\blank}{\sqcup}                    % blank symbol
+\newcommand{\eps}{\varepsilon}                 % empty string
+\newcommand{\rev}[1]{#1^{R}}                   % reverse of a string
+\newcommand{\chk}{\checkmark}                  % check mark on the tape
+
+% Languages and machines
+\newcommand{\lang}[1]{L(#1)}                   % L(M)
+\newcommand{\comp}[1]{\overline{#1}}           % complement
+\newcommand{\enc}[1]{\langle #1 \rangle}       % encoding <M>, <M,x>
+\newcommand{\set}[2]{\left\{ #1 \,\middle|\, #2 \right\}}  % {x | ...}
+
+% Named languages
+\newcommand{\ATM}{A_{\mathrm{TM}}}
+\newcommand{\HALT}{\mathrm{HALT}}
+\newcommand{\EQTM}{\mathrm{EQ}_{\mathrm{TM}}}
+\newcommand{\ETM}{E_{\mathrm{TM}}}
+
+% Transitions:  \trans{q}{a}{p}{b}{R}  ->  delta(q,a) = (p,b,R)
+\newcommand{\trans}[5]{\delta(#1, #2) = (#3, #4, #5)}
+\newcommand{\qacc}{q_{\mathrm{accept}}}
+\newcommand{\qrej}{q_{\mathrm{reject}}}
+
+% Reductions
+\newcommand{\mred}{\le_{m}}                    % mapping reducible
+\newcommand{\red}{\le}                         % generic reduction
+
+% Complexity / classes (for later in the course)
+\newcommand{\cls}[1]{\mathsf{#1}}              % \cls{P}, \cls{NP}, \cls{RE}
+
+% ---------- Tape diagram ----------
+% \tape{a,b,c,\blank}{2}  draws cells a b c _ with the head over cell 2.
+% Optional first arg labels the head with a state: \tape[q_1]{...}{2}
+\newcommand{\tape}[3][]{%
+  \begin{tikzpicture}[baseline=-0.5ex]
+    \foreach \sym [count=\cellnum] in {#2} {
+      \node[draw, minimum width=0.7cm, minimum height=0.7cm, inner sep=0pt]
+        (c\cellnum) at (0.7*\cellnum, 0) {$\sym$};
+      \xdef\lastcell{\cellnum}
+    }
+    \node[right=0pt of c\lastcell, minimum height=0.7cm] {$\cdots$};
+    \draw[-{Latex}, thick] ($(c#3.north)+(0,0.55)$) -- (c#3.north);
+    \node[above=0.55cm of c#3, inner sep=1pt] {$#1$};
+  \end{tikzpicture}%
+}
+
+% ============================================================
+\begin{document}
+
+\begin{center}
+  {\Large\bfseries \coursename\ --- Homework \hwnumber}\\[4pt]
+  \studentname \quad\textbullet\quad Due \duedate\\[2pt]
+  {\small Collaborators: \collaborators}
+\end{center}
+\hrule
+
+% ============================================================
+%  PROBLEM TEMPLATE 1: Designing a Turing machine
+% ============================================================
+\begin{problem}[Design a TM]
+Specify a 1-tape Turing machine that accepts
+\[
+  L = \set{x\#y\#x}{x, y \in \{0,1\}^{+}}.
+\]
+\end{problem}
+
+\begin{solution}
+\textbf{Idea.} Check the format, then repeatedly check off the leftmost
+unchecked symbol of the first block, remember it in the state, and check
+off the matching symbol in the third block.
+
+\textbf{High-level description.}
+$M$ = ``On input $w$:
+\begin{enumerate}[label=\arabic*.]
+  \item Scan $w$; if it is not of the form $\{0,1\}^{+}\#\{0,1\}^{+}\#\{0,1\}^{+}$,
+        \emph{reject}. Return the head to the left end.
+  \item Move right past any $\chk$'s. If the head reads $\#$, go to stage 4.
+  \item Remember the symbol $s \in \{0,1\}$ in the state and replace it
+        with $\chk$. Move right past both $\#$'s and any $\chk$'s.
+        If the symbol there is $s$, replace it with $\chk$ and return to the
+        left end; go to stage 2. Otherwise (mismatch or $\blank$), \emph{reject}.
+  \item Move right past $y$, the second $\#$, and any $\chk$'s.
+        If the head reads $\blank$, \emph{accept}; otherwise \emph{reject}.''
+\end{enumerate}
+
+\textbf{Pseudocode} (optional).
+\begin{algorithmic}[1]
+  \State check format; \textbf{reject} if bad
+  \Loop
+    \State move right past all $\chk$
+    \If{head reads $\#$} \textbf{break} \EndIf
+    \State $s \gets$ symbol under head; write $\chk$
+    \State move right past two $\#$'s and all $\chk$
+    \If{symbol $= s$} write $\chk$ \Else\ \textbf{reject} \EndIf
+    \State move left past two $\#$'s, then left to the last $\chk$
+  \EndLoop
+  \State skip $y$, $\#$, and $\chk$'s; \textbf{accept} iff head reads $\blank$
+\end{algorithmic}
+
+\textbf{Formal definition.} $M = (Q, \Sig, \Gam, \delta, q_0, \qacc, \qrej)$ with
+$\Sig = \{0,1,\#\}$, $\Gam = \{0,1,\#,\chk,\blank\}$. Transitions not listed go to $\qrej$.
+
+\begin{center}
+\begin{tabular}{@{}lccccl@{}}
+\toprule
+State & Read & Write & Move & Next & Comment \\
+\midrule
+$q_0$       & $0,1$ & same   & R & $q_1$      & first block nonempty \\
+$q_1$       & $0,1$ & same   & R & $q_1$      & \\
+$q_1$       & $\#$  & $\#$   & R & $q_2$      & \\
+$\vdots$    &       &        &   &            & (fill in remaining rows) \\
+$c_0''$     & $0$   & $\chk$ & L & $q_{\text{back}}$ & match \\
+$q_{\text{check}}$ & $\blank$ & $\blank$ & -- & $\qacc$ & \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Example run} on $01\#1\#01$ (after first match):
+\[
+  \tape[q_{\text{back}}]{\chk,1,\#,1,\#,\chk,1,\blank}{5}
+\]
+
+\textbf{Correctness.} Each loop iteration checks off exactly one symbol of
+the first block and the symbol in the same position of the third block,
+rejecting on mismatch. The loop ends when the first block is fully checked;
+stage 4 then accepts iff the third block has no unchecked symbols, i.e.\
+iff both blocks have the same length and agree everywhere. Hence
+$\lang{M} = L$.
+\end{solution}
+
+% ============================================================
+%  PROBLEM TEMPLATE 2: Undecidability by reduction
+% ============================================================
+\begin{problem}[Undecidability]
+Show that $\EQTM = \set{\enc{M_1, M_2}}{\lang{M_1} = \lang{M_2}}$ is undecidable.
+\end{problem}
+
+\begin{solution}
+We reduce from $\ATM$, which is undecidable. Suppose for contradiction that
+a TM $R$ decides $\EQTM$. Construct a TM $S$ deciding $\ATM$:
+
+$S$ = ``On input $\enc{M, x}$:
+\begin{enumerate}[label=\arabic*.]
+  \item Construct $M_1$ = ``On input $y$: ignore $y$, simulate $M$ on $x$,
+        and accept if $M$ accepts.''
+  \item Construct $M_2$ = ``On input $y$: accept.''
+  \item Run $R$ on $\enc{M_1, M_2}$ and output what $R$ outputs.''
+\end{enumerate}
+
+\textbf{Why it works.}
+\begin{itemize}
+  \item If $M$ accepts $x$, then $\lang{M_1} = \Sig^* = \lang{M_2}$, so $R$ accepts.
+  \item If $M$ does not accept $x$, then $\lang{M_1} = \emptyset \ne \lang{M_2}$, so $R$ rejects.
+\end{itemize}
+$S$ always halts because $R$ does, so $S$ decides $\ATM$, a contradiction.
+Therefore $\EQTM$ is undecidable.
+\end{solution}
+
+% ============================================================
+%  PROBLEM TEMPLATE 3: Closure / recognizability proof
+% ============================================================
+\begin{problem}[Recognizability]
+Prove: if $L$ and $\comp{L}$ are both recognizable, then $L$ is decidable.
+\end{problem}
+
+\begin{solution}
+Let $M_1$ recognize $L$ and $M_2$ recognize $\comp{L}$. Define
+
+$M$ = ``On input $w$: run $M_1$ and $M_2$ on $w$ in parallel, alternating
+one step each. If $M_1$ accepts, \emph{accept}; if $M_2$ accepts, \emph{reject}.''
+
+Every $w$ is in exactly one of $L$ or $\comp{L}$, so exactly one of $M_1, M_2$
+eventually accepts. Thus $M$ always halts, and it accepts exactly $L$.
+\end{solution}
+
+% ============================================================
+%  BLANK PROBLEM -- copy this block for new problems
+% ============================================================
+\begin{problem}
+% Problem statement here.
+\end{problem}
+
+\begin{solution}
+% Your answer here.
+\end{solution}
+
+\end{document}
