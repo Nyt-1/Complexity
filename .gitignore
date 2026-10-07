@@ -1,0 +1,31 @@
+# ---- LaTeX build files ----
+*.aux
+*.log
+*.out
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.synctex(busy)
+*.toc
+*.lof
+*.lot
+*.bbl
+*.blg
+*.bcf
+*.run.xml
+*.nav
+*.snm
+*.vrb
+*.xdv
+*.dvi
+
+# ---- Compiled PDFs ----
+# Uncomment to keep PDFs out of the repo (they can always be rebuilt from .tex)
+# *.pdf
+
+# ---- macOS ----
+.DS_Store
+
+# ---- Editors ----
+.vscode/
+*.swp

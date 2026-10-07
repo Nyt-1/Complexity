@@ -1,0 +1,665 @@
+% ============================================================
+%  Complexity -- Homework 1
+%  Compile with:  pdflatex hw-template.tex   (run twice)
+% ============================================================
+\documentclass[11pt]{article}
+
+% ---------- Packages ----------
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb, amsthm, mathtools}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{fancyhdr}
+\usepackage{tikz}
+\usetikzlibrary{automata, positioning, arrows.meta, calc}
+\usepackage{algorithm}
+\usepackage[noend]{algpseudocode}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage[hidelinks]{hyperref}
+
+% Code listings for turingmachinesimulator.com programs
+\lstset{
+  basicstyle=\ttfamily\small,
+  columns=fullflexible,
+  keepspaces=true,
+  frame=single,
+  breaklines=true,
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  commentstyle=\color{gray}\itshape,
+  comment=[l]{//},
+  morecomment=[s]{/*}{*/},
+}
+
+% ---------- Fill these in ----------
+\newcommand{\studentname}{Nicole Tian}
+\newcommand{\coursename}{Theory of Complexity}
+\newcommand{\hwnumber}{1}
+\newcommand{\duedate}{TBD}
+\newcommand{\collaborators}{None}   % list anyone you worked with
+
+% ---------- Header / footer ----------
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\studentname}
+\chead{\coursename}
+\rhead{Homework \hwnumber}
+\cfoot{\thepage}
+\setlength{\headheight}{14pt}
+
+% ---------- Problem / solution environments ----------
+\newcounter{problem}
+\newenvironment{problem}[1][]{%
+  \refstepcounter{problem}\par\bigskip
+  \noindent\textbf{Problem \theproblem}%
+  \if\relax\detokenize{#1}\relax\else\ \textbf{(#1)}\fi
+  \par\smallskip\noindent\itshape
+}{\par\medskip}
+
+\newenvironment{solution}{%
+  \par\noindent\textbf{Solution.}\ \normalfont
+}{\hfill$\blacksquare$\par\medskip}
+
+% Sub-parts: \begin{parts} \item ... \end{parts}  -> (a), (b), ...
+\newlist{parts}{enumerate}{1}
+\setlist[parts]{label=(\alph*), leftmargin=*}
+
+% Theorem-style environments
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{claim}[theorem]{Claim}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+
+% ---------- Notation macros ----------
+% Alphabets, strings
+\newcommand{\Sig}{\Sigma}
+\newcommand{\Gam}{\Gamma}
+\newcommand{\blank}{\sqcup}                    % blank symbol
+\newcommand{\eps}{\varepsilon}                 % empty string
+\newcommand{\rev}[1]{#1^{R}}                   % reverse of a string
+\newcommand{\chk}{\checkmark}                  % check mark on the tape
+
+% Languages and machines
+\newcommand{\lang}[1]{L(#1)}                   % L(M)
+\newcommand{\comp}[1]{\overline{#1}}           % complement
+\newcommand{\enc}[1]{\langle #1 \rangle}       % encoding <M>, <M,x>
+\newcommand{\set}[2]{\left\{ #1 \,\middle|\, #2 \right\}}  % {x | ...}
+
+% Named languages
+\newcommand{\ATM}{A_{\mathrm{TM}}}
+\newcommand{\HALT}{\mathrm{HALT}}
+\newcommand{\EQTM}{\mathrm{EQ}_{\mathrm{TM}}}
+\newcommand{\ETM}{E_{\mathrm{TM}}}
+
+% Transitions:  \trans{q}{a}{p}{b}{R}  ->  delta(q,a) = (p,b,R)
+\newcommand{\trans}[5]{\delta(#1, #2) = (#3, #4, #5)}
+\newcommand{\qacc}{q_{\mathrm{accept}}}
+\newcommand{\qrej}{q_{\mathrm{reject}}}
+
+% Reductions
+\newcommand{\mred}{\le_{m}}                    % mapping reducible
+\newcommand{\red}{\le}                         % generic reduction
+
+% Complexity / classes (for later in the course)
+\newcommand{\cls}[1]{\mathsf{#1}}              % \cls{P}, \cls{NP}, \cls{RE}
+
+% ---------- Tape diagram ----------
+% \tape{a,b,c,\blank}{2}  draws cells a b c _ with the head over cell 2.
+% Optional first arg labels the head with a state: \tape[q_1]{...}{2}
+\newcommand{\tape}[3][]{%
+  \begin{tikzpicture}[baseline=-0.5ex]
+    \foreach \sym [count=\cellnum] in {#2} {
+      \node[draw, minimum width=0.7cm, minimum height=0.7cm, inner sep=0pt]
+        (c\cellnum) at (0.7*\cellnum, 0) {$\sym$};
+      \xdef\lastcell{\cellnum}
+    }
+    \node[right=0pt of c\lastcell, minimum height=0.7cm] {$\cdots$};
+    \draw[-{Latex}, thick] ($(c#3.north)+(0,0.55)$) -- (c#3.north);
+    \node[above=0.55cm of c#3, inner sep=1pt] {$#1$};
+  \end{tikzpicture}%
+}
+
+% ============================================================
+\begin{document}
+
+\begin{center}
+  {\Large\bfseries \coursename\ --- Homework \hwnumber}\\[4pt]
+  \studentname \quad\textbullet\quad Due \duedate\\[2pt]
+  {\small Collaborators: \collaborators}
+\end{center}
+\hrule
+
+% ============================================================
+%  PROBLEM 1
+% ============================================================
+\section*{Problem 1}
+\begin{solution}
+\textbf{(i) 1-tape machine.}
+
+\emph{Strategy.}
+I used the two `\#'s as markers so the head knows whether it should be recording, passing by, or searching. The head marks the first unmarked character of $x$ with an `X' and remembers whether it was a 0 or a 1 in its state. It then moves right past both `\#'s and any `X's to the first unmarked character of the third string. If that character matches, it is marked with an `X' and the head returns left to the next unmarked character of $x$; if it does not match, the machine rejects. This repeats until all of $x$ is marked, and then stage two begins. Stage two checks that $y$ is non-empty and contains only 0s and 1s, and then checks that every character of the third string has been marked (only `X's before the blank). An empty $x$ or $y$ is rejected in the very first state. Mismatched lengths are caught in both directions: if the third string is too short, the search reaches a blank in stage one; if it is too long, stage two finds an unmarked digit.
+
+\vspace{3pt}
+\emph{States.} I used states to remember what was seen and what the head should be doing at the time. I also used different states for the two stages.
+
+\begin{itemize}
+  \item \texttt{qstart}: Reads the first symbol of $x$. Rejects on `\#' (empty $x$); otherwise marks it `X' and remembers the bit.
+  \item \texttt{q0}: Reads the next unmarked symbol of $x$, marks it `X' and remembers the bit. On `\#', $x$ is used up, so it moves to stage two.
+  \item \texttt{qRight0}, \texttt{qRight1}: Carry the remembered bit (0 or 1) right across the rest of $x$ to the first `\#'.
+  \item \texttt{qRight0\#}, \texttt{qRight1\#}: Carry the remembered bit right across $y$ to the second `\#'.
+  \item \texttt{q0Search}, \texttt{q1Search}: Skip the `X's in the third string and compare the first unmarked symbol with the remembered bit. A match is marked `X' and the head turns left.
+  \item \texttt{qLeft}: Moves left through the third string to the second `\#'.
+  \item \texttt{qLeft\#}: Moves left through $y$ to the first `\#'.
+  \item \texttt{qLeft\#\#}: Moves left through $x$ to the rightmost `X', then steps right and returns to \texttt{q0}.
+  \item \texttt{qPhase2Start}: Stage two. Requires at least one digit in $y$; rejects on `\#' (empty $y$).
+  \item \texttt{qPhase2}: Moves right through the rest of $y$ to the second `\#'.
+  \item \texttt{qPhase2End}: Skips the `X's in the third string. Accepts on a blank; rejects on a leftover 0, 1, or an extra `\#'.
+  \item \texttt{qAccept}: Accepting state.
+  \item \texttt{qReject}: Rejecting state.
+\end{itemize}
+
+\emph{Code.}
+\begin{lstlisting}
+// Input: a string over {0, 1, #}
+// Output: accepts if the string has the form x#y#x,
+//         where x and y are non-empty binary strings
+// Example: accepts 10#010#10
+//
+// Tape alphabet: {0, 1, #, X, _}
+
+// Link: http://turingmachinesimulator.com/shared/nkcmswpree
+
+name: OneTape_xyx
+init: qstart
+accept: qAccept
+
+// Stage 1: first symbol of x (rejects empty x)
+qstart,#
+qReject,_,-
+
+qstart,0
+qRight0,X,>
+
+qstart,1
+qRight1,X,>
+
+// Stage 1: next unmarked symbol of x
+q0,0
+qRight0,X,>
+
+q0,1
+qRight1,X,>
+
+// Carry the bit across the rest of x
+qRight0,0
+qRight0,0,>
+
+qRight0,1
+qRight0,1,>
+
+qRight0,#
+qRight0#,#,>
+
+qRight1,0
+qRight1,0,>
+
+qRight1,1
+qRight1,1,>
+
+qRight1,#
+qRight1#,#,>
+
+// Carry the bit across y
+qRight0#,0
+qRight0#,0,>
+
+qRight0#,1
+qRight0#,1,>
+
+qRight0#,#
+q0Search,#,>
+
+qRight1#,0
+qRight1#,0,>
+
+qRight1#,1
+qRight1#,1,>
+
+qRight1#,#
+q1Search,#,>
+
+// Look for a match in the third string
+q0Search,X
+q0Search,X,>
+
+q0Search,0
+qLeft,X,<
+
+q0Search,1
+qReject,_,-
+
+q1Search,X
+q1Search,X,>
+
+q1Search,1
+qLeft,X,<
+
+q1Search,0
+qReject,_,-
+
+// Return left through the third string
+qLeft,X
+qLeft,X,<
+
+qLeft,0
+qLeft,0,<
+
+qLeft,1
+qLeft,1,<
+
+qLeft,#
+qLeft#,#,<
+
+// Return left through y
+qLeft#,0
+qLeft#,0,<
+
+qLeft#,1
+qLeft#,1,<
+
+qLeft#,#
+qLeft##,#,<
+
+// Return left through x to the last X
+qLeft##,0
+qLeft##,0,<
+
+qLeft##,1
+qLeft##,1,<
+
+qLeft##,X
+q0,X,>
+
+// Stage 2: x is fully matched
+q0,#
+qPhase2Start,#,>
+
+// y must be non-empty
+qPhase2Start,0
+qPhase2,X,>
+
+qPhase2Start,1
+qPhase2,X,>
+
+qPhase2Start,#
+qReject,_,-
+
+qPhase2Start,X
+qReject,_,-
+
+// Scan the rest of y
+qPhase2,0
+qPhase2,X,>
+
+qPhase2,1
+qPhase2,X,>
+
+qPhase2,X
+qReject,_,-
+
+qPhase2,#
+qPhase2End,#,>
+
+// Third string must be all X, then blank
+qPhase2End,X
+qPhase2End,X,>
+
+qPhase2End,0
+qReject,_,-
+
+qPhase2End,1
+qReject,_,-
+
+qPhase2End,#
+qReject,_,-
+
+qPhase2End,_
+qAccept,_,-
+\end{lstlisting}
+
+\emph{Test inputs.}
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Input & Expected & Result \\
+\midrule
+\texttt{01\#1\#01}     & accept & accept \\
+\texttt{10\#010\#10}   & accept & accept \\
+\texttt{1\#0\#1}       & accept & accept \\
+\texttt{01\#1\#10}     & reject & reject \\
+\texttt{01\#1\#011}    & reject & reject \\
+\texttt{01\#1\#0}      & reject & reject \\
+\texttt{\#1\#}         & reject & reject \\
+\texttt{1\#\#1}        & reject & reject \\
+\texttt{1\#0\#1\#}     & reject & reject \\
+\texttt{1\#0}          & reject & reject \\
+$\varepsilon$ (empty)  & reject & reject \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\bigskip
+\textbf{(ii) 2-tape machine.}
+
+\emph{Strategy.}
+The second tape lets the machine remember all of $x$ at once instead of one character at a time. In the first pass, the machine copies $x$ onto tape 2 (marking each copied character on tape 1 with an `X') until it reaches the first `\#'. Tape 1's head then moves right to the end of the input while tape 2's head waits just past the end of the copy. Next, both heads move left together, comparing the third string with the copy character by character from right to left, and any mismatch rejects. When the copy runs out, tape 1's head must be on the second `\#', so a third string that is too long or too short is rejected here. Finally, tape 1's head continues left to check that $y$ is non-empty and that only marked `X's (all of $x$) remain before the left blank.
+
+\emph{States.}
+\begin{itemize}
+  \item \texttt{qCopyF}: Copies the first symbol of $x$ to tape 2. Rejects on `\#' (empty $x$).
+  \item \texttt{qCopy}: Copies the rest of $x$ to tape 2, marking tape 1 with `X'. On `\#', moves to \texttt{qSearch}.
+  \item \texttt{qSearch}: Moves tape 1's head right to the blank at the end of the input; tape 2's head stays put.
+  \item \texttt{qTest}: Moves both heads left, comparing the third string with the copy of $x$. Rejects on a mismatch or a length difference. When tape 2 reaches a blank and tape 1 reads `\#', moves to \texttt{qPhase2F}.
+  \item \texttt{qPhase2F}: Requires at least one digit in $y$; rejects on `\#' (empty $y$).
+  \item \texttt{qPhase2}: Moves left through the rest of $y$ to the first `\#'.
+  \item \texttt{qPhase2End}: Moves left through $x$, which should be all `X's. Accepts on the blank; rejects on an unmarked digit.
+  \item \texttt{qAccept}: Accepting state.
+  \item \texttt{qReject}: Rejecting state.
+\end{itemize}
+
+\emph{Code.}
+\begin{lstlisting}
+// Input: a string over {0, 1, #}
+// Output: accepts if the string has the form x#y#x,
+//         where x and y are non-empty binary strings
+// Example: accepts 10#010#10
+//
+// Tape 1 alphabet: {0, 1, #, X, _}
+// Tape 2 alphabet: {0, 1, X, _}
+
+//Link: http://turingmachinesimulator.com/shared/lhxsggvnky
+
+name: TwoTape_xyx
+init: qCopyF
+accept: qAccept
+
+// Copy x onto tape 2 (first symbol: rejects empty x)
+qCopyF,0,_
+qCopy,X,0,>,>
+
+qCopyF,1,_
+qCopy,X,1,>,>
+
+qCopyF,#,_
+qReject,_,_,-,-
+
+// Copy the rest of x
+qCopy,0,_
+qCopy,X,0,>,>
+
+qCopy,1,_
+qCopy,X,1,>,>
+
+qCopy,#,_
+qSearch,#,_,>,-
+
+// Move tape 1 to the end of the input
+qSearch,0,_
+qSearch,0,_,>,-
+
+qSearch,1,_
+qSearch,1,_,>,-
+
+qSearch,#,_
+qSearch,#,_,>,-
+
+qSearch,_,_
+qTest,_,_,<,<
+
+// Compare the third string with the copy, right to left
+qTest,0,0
+qTest,X,X,<,<
+
+qTest,1,1
+qTest,X,X,<,<
+
+qTest,0,1
+qReject,0,1,-,-
+
+qTest,1,0
+qReject,1,0,-,-
+
+qTest,#,0
+qReject,#,0,-,-
+
+qTest,#,1
+qReject,#,1,-,-
+
+qTest,0,_
+qReject,0,_,-,-
+
+qTest,1,_
+qReject,1,_,-,-
+
+qTest,#,_
+qPhase2F,#,_,<,-
+
+// y must be non-empty
+qPhase2F,0,_
+qPhase2,0,_,<,-
+
+qPhase2F,1,_
+qPhase2,1,_,<,-
+
+qPhase2F,#,_
+qReject,#,_,-,-
+
+// Move left through the rest of y
+qPhase2,0,_
+qPhase2,0,_,<,-
+
+qPhase2,1,_
+qPhase2,1,_,<,-
+
+qPhase2,#,_
+qPhase2End,#,_,<,-
+
+// x must be all X, then blank
+qPhase2End,X,_
+qPhase2End,X,_,<,-
+
+qPhase2End,_,_
+qAccept,_,_,-,-
+
+qPhase2End,0,_
+qReject,0,_,-,-
+
+qPhase2End,1,_
+qReject,1,_,-,-
+\end{lstlisting}
+
+\emph{Test inputs.}
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Input & Expected & Result \\
+\midrule
+\texttt{01\#1\#01}     & accept & accept \\
+\texttt{10\#010\#10}   & accept & accept \\
+\texttt{1\#0\#1}       & accept & accept \\
+\texttt{01\#1\#10}     & reject & reject \\
+\texttt{01\#1\#011}    & reject & reject \\
+\texttt{01\#1\#0}      & reject & reject \\
+\texttt{\#1\#}         & reject & reject \\
+\texttt{1\#\#1}        & reject & reject \\
+\texttt{1\#0\#1\#}     & reject & reject \\
+\texttt{1\#0}          & reject & reject \\
+$\varepsilon$ (empty)  & reject & reject \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\bigskip
+\textbf{(iii) Number of moves.}
+Let $n$ be the length of the input.
+\begin{itemize}
+  \item 1-tape machine: $\Theta(n^2)$ moves in the worst case, because each character of $x$ requires a round trip from its position in $x$.
+  \item 2-tape machine: $\Theta(n)$ moves, because each head passes over the input twice so the total is at most about $2n$ moves.
+\end{itemize}
+\end{solution}
+
+% ============================================================
+%  PROBLEM 2
+% ============================================================
+\newpage
+\section*{Problem 2}
+\begin{solution}
+I use a 4-tape Turing machine. Tape 1 holds the input and receives the output. Tapes 2 and 3 are counters for $i$ and $j$, and tape 4 holds a copy of one register, which becomes the result. All tapes other than tape 1 start blank.
+
+\textbf{Tape alphabet.} Tape 1: $\{0, 1, \#, \blank\}$. Tapes 2 and 3: $\{1, \blank\}$. Tape 4: $\{0, 1, \blank\}$. No marker symbols are needed, because tape 1 is never modified except for the appended result.
+
+\textbf{Overview.}
+The machine copies $i$ and $j$ onto tapes 2 and 3. It then makes a single left-to-right pass over $\mathit{MEM}$, removing one $1$ from both counters every time it crosses a $\#$ to keep track of register numbers. When either counters on tape 2 or 3 runs out (head reaches a blank), we have reached one of the registers we need. The first register reached (register $\min(i,j)$) is copied onto tape 4. When the second register is reached, it is XORed bit by bit into tape 4, overwriting the copy. Finally, tape 1's head moves to the end of the input and the contents of tape 4 are copied there. Because both registers are found in one pass, the machine runs in $O(n)$ moves, where $n$ is the input length.
+
+\emph{Edge Cases} Writing $i$ and $j$ to tapes 2 and 3, decrement by 1 automatically to account for the fact that by reaching the end of $j$, we have already entered register 1. If $i$ and $j$ run out at the same time ($i = j$), we append a string of $0$s.
+
+\vspace{5 pt}
+\textbf{Step 1: Set up the counters and locate the first register.}
+\begin{itemize}
+  \item \texttt{qCopyI}: Tape 1 moves right over $i$, writing a $1$ on tape 2 for each $1$ read. On $\#$, move tape 1 right and go to \texttt{qCopyJ}.
+  \item \texttt{qCopyJ}: Same for $j$, writing onto tape 3. On $\#$, tape 1's head moves right to the first cell of register 1; tapes 2 and 3 move left onto their last $1$s. Go to \texttt{qInit}.
+  \item \texttt{qInit}: Decrement both counters once. Register 1 begins before any $\#$ in $\mathit{MEM}$ is crossed and this initial decrement corrects for that. Go to \texttt{qCheck1}.
+  \item \texttt{qCheck1} (no movement; looks at tapes 2 and 3):
+    \begin{itemize}
+      \item both counters non-empty $\Rightarrow$ \texttt{qSeek1};
+      \item exactly one counter empty $\Rightarrow$ \texttt{qCopy} (tape 1 is at the start of the first register);
+      \item both counters empty $\Rightarrow$ \texttt{qZero} (this is the case $i = j$).
+    \end{itemize}
+  \item \texttt{qSeek1}: Tape 1 moves right over $0$s and $1$s. On $\#$, tape 1 moves right and both counters are decremented in the same move. Go to \texttt{qCheck1}.
+\end{itemize}
+
+\textbf{Step 2: Copy the first register and locate the second.}
+\begin{itemize}
+  \item \texttt{qCopy}: For each bit $b$ on tape 1, write $b$ on tape 4 and move tapes 1 and 4 right. On $\#$, tape 1 moves right and both counters are decremented. Go to \texttt{qCheck2}.
+  \item \texttt{qCheck2} (no movement): if both counters are empty, tape 1 is at the start of the second register, so go to \texttt{qRewind4}; otherwise go to \texttt{qSeek2}. (The counter emptied in Step 1 stays empty, so checking that \emph{both} are empty is enough.)
+  \item \texttt{qSeek2}: Tape 1 moves right over $0$s and $1$s. On $\#$, tape 1 moves right and both counters are decremented. Go to \texttt{qCheck2}.
+  \item \texttt{qZero} (only when $i = j$): The XOR of a register with itself is all $0$s. For each bit on tape 1, write $0$ on tape 4 and move tapes 1 and 4 right. On $\#$, go to \texttt{qToEnd}.
+\end{itemize}
+
+\textbf{Step 3: Compute the EOR bit by bit and append it.}
+\begin{itemize}
+  \item \texttt{qRewind}: Move tape 4 left until it reads $\blank$. Go to \texttt{qXorInit}.
+  \item \texttt{qXorInit}: Move tape 1 and 4 one to the right. Go to \texttt{qXor}.
+  \item \texttt{qXor}: Read bit $a$ on tape 1 and bit $b$ on tape 4; write $a \oplus b$ on tape 4 and move tapes 1 and 4 right. The transitions are $(0,0) \to 0$, $(1,1) \to 0$, $(0,1) \to 1$, $(1,0) \to 1$. All registers have the same length $k$, so the loop ends exactly when tape 1 reads $\#$. Go to \texttt{qToEnd}.
+  \item \texttt{qToEnd}: Move tape 1 right over everything until it reads $\blank$; this is the cell just after the final $\#$. Go to \texttt{qRewind4b}.
+  \item \texttt{qRewind4}: Rewind tape 4 to its first bit. Go to \texttt{qAppend}.
+  \item \texttt{qAppend}: Copy the bit on tape 4 onto tape 1 and move both right. When tape 4 reads $\blank$, halt and go to \texttt{qAccept}.
+\end{itemize}
+
+\textbf{Example trace} on \texttt{11\#111\#0000\#0100\#0011\#0110\#} ($i = 2$, $j = 3$, $k = 4$):
+
+\begin{center}
+\begin{tabular}{@{}llccc@{}}
+\toprule
+Moment & Tape 1 head at & Tape 2 & Tape 3 & Tape 4 \\
+\midrule
+after \texttt{qCopyJ}        & start of reg.\ 1 (\texttt{0000}) & \texttt{11} & \texttt{111} & $\blank$ \\
+after \texttt{qInit}         & start of reg.\ 1                 & \texttt{1}  & \texttt{11}  & $\blank$ \\
+cross \#, \texttt{qCheck1}   & start of reg.\ 2 (\texttt{0100}) & $\blank$    & \texttt{1}   & $\blank$ \\
+after \texttt{qCopy}, cross \# & start of reg.\ 3 (\texttt{0011}) & $\blank$  & $\blank$     & \texttt{0100} \\
+after \texttt{qXor}          & \# after reg.\ 3                 & $\blank$    & $\blank$     & \texttt{0111} \\
+after \texttt{qAppend}       & end of tape                      & $\blank$    & $\blank$     & \texttt{0111} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent The final contents of tape 1 are
+\[
+  \texttt{11\#111\#0000\#0100\#0011\#0110\#0111}.
+\]
+
+\bigskip
+\textbf{Extra credit: implementation.}
+\end{solution}
+
+% ============================================================
+%  PROBLEM 3
+% ============================================================
+\newpage
+\section*{Problem 3}
+\noindent\emph{Every infinite c.e.\ language has an infinite subset that is computable.}
+
+\begin{solution}
+Let $L$ be an infinite c.e.\ language.
+
+% Proof here.
+\end{solution}
+
+% ============================================================
+%  PROBLEM 4
+% ============================================================
+\newpage
+\section*{Problem 4}
+\begin{solution}
+\textbf{(1) Simulating $P$ with a Turing machine.}
+
+Given a program $P$, we build a Turing machine that simulates $P$.
+
+\begin{itemize}
+  \item The tape alphabet is $I$, with \texttt{BLANK} as the blank symbol. Tape cell $m$ holds register $R_m$.
+  \item The head position is \texttt{CURRENT}: the head on cell $m$ means \texttt{CURRENT} $= m$. The head starts on cell $0$.
+  \item To accommodate negative registers, we use a two-way infinite tape.
+  \item For each instruction number $n$ of $P$ there is a state $q_n$, meaning ``we are on instruction $n$.'' The start state is $q_0$.
+  \item $x$ represents any character in the finite alphabet $I$.
+  \item $q_{\mathrm{accept}}$ is the accept state and $q_{\mathrm{reject}}$ is the reject state. The machine halts when it enters either one.
+\end{itemize}
+
+
+
+\begin{lstlisting}
+// WRITE c
+q_n, x
+q_{n+1}, c, -
+
+// IF c GOTO j
+q_n, c
+q_j, c, -
+
+q_n, x          (for every x != c)
+q_{n+1}, x, -
+
+// CURRENT++
+q_n, x
+q_{n+1}, x, >
+
+// CURRENT--
+q_n, x
+q_{n+1}, x, <
+
+// ACCEPT
+q_n, x
+qAccept, x, -
+
+// REJECT
+q_n, x
+qReject, x, -
+
+// No instruction to go to
+// (q_{n+1} or q_j is not a line of P):
+q_loop, x
+q_loop, x, >
+\end{lstlisting}
+
+Every instruction except \texttt{IF}, \texttt{ACCEPT} and \texttt{REJECT} goes to $q_{n+1}$, so the instructions run in order, and \texttt{IF c GOTO j} goes to $q_j$ when the symbol read is $c$.
+
+If $q_{n+1}$ or $q_j$ is not an instruction of $P$, it enters the infinite loop state that moves right forever.
+
+Each step of the Turing machine carries out one instruction of $P$, with the same effect on the registers (the tape), the same value of \texttt{CURRENT} (the head position), and the same next instruction (the next state). Therefore the machine accepts, rejects, or runs forever exactly when $P$ does.
+\end{solution}
+
+\end{document}
